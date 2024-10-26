@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu de Mémoire Spatial</title>
+    <style>
+        .memory-game {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            aspect-ratio: 1;
+            background: #16213e;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0;
+            transition: all 0.3s ease;
+        }
+
+        .card.flipped {
+            background: #0f3460;
+            font-size: 24px;
+        }
+
+        .game-info {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .timer, .moves {
+            font-size: 20px;
+            margin: 10px;
+            color: #e94560;
+        }
+
+        button {
+            background: #e94560;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #ba2d47;
+        }
+
+        .hide {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .cards-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+            .card {
+        transform-style: preserve-3d;
+        transition: transform 0.6s;
+		    }
+
+		    .card.flipped {
+		        transform: rotateY(180deg);
+		    }
+
+		    .difficulty-select {
+		        margin: 10px 0;
+		    }
+
+		    .high-scores {
+		        margin-top: 20px;
+		        padding: 10px;
+		        background: rgba(255, 255, 255, 0.1);
+		        border-radius: 5px;
+		    }
+
+		    .score {
+		        color: #e94560;
+		        font-size: 24px;
+		        margin: 10px 0;
+		    }
+
+		    /* Animation de victoire */
+		    @keyframes celebrate {
+		        0% { transform: scale(1); }
+		        50% { transform: scale(1.1); }
+		        100% { transform: scale(1); }
+		    }
+
+		    .celebration {
+		        animation: celebrate 0.5s ease-in-out;
+		    }
+				    /* Styles existants... */
+		    .sound-control {
+		        text-align: center;
+		        margin: 10px;
+		    }
+    </style>
+</head>
+<body>
+    <div class="memory-game">
+        <h2>Jeu de Mémoire Spatial</h2>
+        <div class="game-info">
+            <span class="timer">Temps: 0s</span>
+            <span class="moves">Coups: 0</span>
+        </div>
+        <div class="cards-container"></div>
+        <button id="start-btn">Démarrer</button>
+        <button id="reset-btn" class="hide">Recommencer</button>
+        <div class="difficulty-select">
+		    <label for="difficulty">Niveau de difficulté:</label>
+		    <select id="difficulty">
+		        <option value="easy">Facile</option>
+		        <option value="medium">Moyen</option>
+		        <option value="hard">Difficile</option>
+		    </select>
+		</div>
+		<div class="score">Score: <span id="score">0</span></div>
+		<div class="high-scores">
+		    <h3>Meilleurs scores</h3>
+		    <ul id="highScoresList"></ul>
+    </div>
+
+    <script>
+				    const victorySound = document.getElementById('victorySound');
+				    const flipSound = document.getElementById('flipSound');
+				    const matchSound = document.getElementById('matchSound');
+				    let soundEnabled = true;
+		        const spaceSymbols = [
+		    '🚀', '🛸', '🌍', '🌙', '⭐', '☄️', '🌠', '🌌', '👽', '🤖', 
+		    '🛰️', '🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘', '🌚',
+		    '🌛', '🌜', '🌞', '🌎', '🌏', '🌐', '✨', '💫', '☀️', '🌥️',
+		    '🌦️', '🌧️', '🌨️', '🌩️', '🌪️', '🌫️', '🌝', '🌡️', '☃️', '⛄',
+		    '🔭', '📡', '🎆', '🎇', '🌈', '🌊', '🎪', '🎢', '🎡', '🎠',
+		    '🦕', '🦖', '🐉', '🐲', '🌳', '🌴', '🌵', '🌸', '🌹', '🌺',
+		    '🌻', '🌼', '🌷', '💐', '🍀', '🎋', '🎍', '🎭', '🎨', '🎪',
+		    '🎫', '🎟️', '🎯', '🎱', '🎮', '🎲', '🎰', '🎳', '🎹', '🎷',
+		    '🎺', '🎸', '🎻', '🎬', '🏹', '🗡️', '⚔️', '🛡️', '⚙️', '⚗️',
+		    '🔮', '📿', '💎', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '📱'
+				];
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let moves = 0;
+        let timer = 0;
+        let timerInterval;
+        let gameStarted = false;
+
+        const cardsContainer = document.querySelector('.cards-container');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerDisplay = document.querySelector('.timer');
+        const movesDisplay = document.querySelector('.moves');
+
+        function initializeGame() {
+            cards = [...spaceSymbols, ...spaceSymbols];
+            shuffleCards();
+            createCards();
+        }
+
+        function shuffleCards() {
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+        }
+
+        function createCards() {
+            cardsContainer.innerHTML = '';
+            cards.forEach((symbol, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.index = index;
+                card.dataset.symbol = symbol;
+                card.addEventListener('click', flipCard);
+                cardsContainer.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+        if (!gameStarted) return;
+        
+        const card = this;
+        if (flippedCards.length === 2 || card.classList.contains('flipped') || 
+            card.classList.contains('matched')) return;
+
+        if (soundEnabled) flipSound.play();
+        card.classList.add('flipped');
+        card.textContent = card.dataset.symbol;
+        flippedCards.push(card);
+
+        if (flippedCards.length === 2) {
+            moves++;
+            movesDisplay.textContent = `Coups: ${moves}`;
+            checkMatch();
+        }
+    }
+
+	       function checkMatch() {
+	        const [card1, card2] = flippedCards;
+	        if (card1.dataset.symbol === card2.dataset.symbol) {
+	            if (soundEnabled) matchSound.play();
+	            card1.classList.add('matched');
+	            card2.classList.add('matched');
+	            matchedPairs++;
+	            if (matchedPairs === spaceSymbols.length) {
+	                endGame();
+	            }
+	        } else {
+	            setTimeout(() => {
+	                card1.classList.remove('flipped');
+	                card2.classList.remove('flipped');
+	                card1.textContent = '';
+	                card2.textContent = '';
+	            }, 1000);
+	        }
+        flippedCards = [];
+    }
+        function startGame() {
+            gameStarted = true;
+            startBtn.classList.add('hide');
+            resetBtn.classList.remove('hide');
+            timerInterval = setInterval(() => {
+                timer++;
+                timerDisplay.textContent = `Temps: ${timer}s`;
+            }, 1000);
+        }
+
+		     function endGame() {
+		        clearInterval(timerInterval);
+		        gameStarted = false;
+		        if (soundEnabled) victorySound.play();
+		        setTimeout(() => {
+		            alert(`Félicitations ! Tu as terminé en ${timer} secondes et ${moves} coups !`);
+		        }, 500);
+		    }
+				function toggleSound() {
+		        soundEnabled = !soundEnabled;
+		        soundToggleBtn.textContent = soundEnabled ? '🔊' : '🔇';
+		    }
+        function resetGame() {
+            clearInterval(timerInterval);
+            gameStarted = false;
+            matchedPairs = 0;
+            moves = 0;
+            timer = 0;
+            flippedCards = [];
+            timerDisplay.textContent = 'Temps: 0s';
+            movesDisplay.textContent = 'Coups: 0';
+            startBtn.classList.remove('hide');
+            resetBtn.classList.add('hide');
+            initializeGame();
+        }
+
+        startBtn.addEventListener('click', startGame);
+        resetBtn.addEventListener('click', resetGame);
+
+        // Initialisation au chargement
+        initializeGame();
+         const soundControl = document.createElement('div');
+			    soundControl.className = 'sound-control';
+			    const soundToggleBtn = document.createElement('button');
+			    soundToggleBtn.textContent = '🔊';
+			    soundToggleBtn.onclick = toggleSound;
+			    soundControl.appendChild(soundToggleBtn);
+			    document.querySelector('.game-info').appendChild(soundControl);
+    </script>
+		    <audio id="victorySound" src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1Q0NDQ0NDUFBQUFBQXl5eXl5ea2tra2tra3l5eXl5eYaGhoaGhpSUlJSUlKGhoaGhoaGvr6+vr6+8vLy8vLzKysrKysrX19fX19fX5eXl5eXl8vLy8vLy////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQCgAAAAAAAAAVY82AhbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAALACwAAP/AADwQKVE9YWDGPkQWpT66yk4+zIiYPoTUaT3tnU+NFxkYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxA8L0DU0AP+0ANgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxBoK4DVpQP8eKDgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxB8ONDVMAv8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxCML0DVcAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxC4NSDVkAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxDcPwDV0AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxD8O2DVcAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxEkNUDV0AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxFYNSDV0AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxGENYDV8AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxGwO4DVcAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxHQOwDVkAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxH4NSDV0AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxIcNODVcAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxJENeEV0AP+0ABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxJ4KiEVsAP/eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY">
+		</audio>
+		<audio id="flipSound" src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1Q0NDQ0NDUFBQUFBQXl5eXl5ea2tra2tra3l5eXl5eYaGhoaGhpSUlJSUlKGhoaGhoaGvr6+vr6+8vLy8vLzKysrKysrX19fX19fX5eXl5eXl8vLy8vLy////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQCgAAAAAAAAAVY82AhbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAALACwAAP/AADwQKVE9YWDGPkQWpT66yk4+zIiYPoTUaT3tnU+NFxkYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxA8L0DU0AP+0ANgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxBoK4DVpQP8eKDgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxB8ONDVMAv8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxCML0DVcAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxC4NSDVkAP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxDcPwDV0AP8eABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY">
+		</audio>
+		<audio id="matchSound" src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1Q0NDQ0NDUFBQUFBQXl5eXl5ea2tra2tra3l5eXl5eYaGhoaGhpSUlJSUlKGhoaGhoaGvr6+vr6+8vLy8vLzKysrKysrX19fX19fX5eXl5eXl8vLy8vLy////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQCgAAAAAAAAAVY82AhbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAALACwAAP/AADwQKVE9YWDGPkQWpT66yk4+zIiYPoTUaT3tnU+NFxkYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY/+MYxA8L0DU0AP+0ANgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY">
+		</audio>
+</body>
+</html>
